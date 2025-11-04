@@ -3,6 +3,10 @@
 Release History
 ===============
 
+1.2.0
++++++
+* Upgrade API version from 2024-05-01 to 2025-10-01-preview
+
 1.1.0
 +++++
 * az databricks workspace create/update: Add --enable-compliance-security-profile to enable the Enhanced Security and Compliance on workspace.
