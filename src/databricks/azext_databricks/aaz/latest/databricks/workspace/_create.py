@@ -17,17 +17,22 @@ from azure.cli.core.aaz import *
 class Create(AAZCommand):
     """Create a new workspace.
 
-    :example: Create a workspace
-        az databricks workspace create --resource-group MyResourceGroup --name MyWorkspace --location westus --sku standard
+    :example: Create a workspace with Hybrid compute mode (default)
+        az databricks workspace create --resource-group MyResourceGroup --name MyWorkspace --location westus --sku standard --compute-mode Hybrid
+
+    :example: Create a Serverless workspace
+        az databricks workspace create --resource-group MyResourceGroup --name MyWorkspace --location westus --sku premium --compute-mode Serverless
 
     :example: Create a workspace with managed identity for storage account
-        az databricks workspace create --resource-group MyResourceGroup --name MyWorkspace --location eastus2euap --sku premium --prepare-encryption
+        az databricks workspace create --resource-group MyResourceGroup --name MyWorkspace --location eastus2euap --sku premium --prepare-encryption --compute-mode Hybrid
 
     :example: Create a workspace with automatic cluster update feature enabled
-        az databricks workspace create --resource-group MyResourceGroup --name MyWorkspace --location eastus2euap --sku premium --enable-automatic-cluster-update
+        az databricks workspace create --resource-group MyResourceGroup --name MyWorkspace --location eastus2euap --sku premium --enable-automatic-cluster-update --compute-mode Hybrid
 
-    :example: Create a workspace with all enhanced security & compliance features enabled with specific compliance standards
-        az databricks workspace create --resource-group MyResourceGroup --name MyWorkspace --location eastus2euap --sku premium --enable-compliance-security-profile --compliance-standards='["HIPAA","PCI_DSS"]' --enable-automatic-cluster-update --enable-enhanced-security-monitoring
+    :example: Create a workspace with enhanced security & compliance features enabled with specific compliance standards
+        az databricks workspace create --resource-group MyResourceGroup --name MyWorkspace --location eastus2euap --sku premium --enable-compliance-security-profile --compliance-standards='["HIPAA","PCI_DSS"]' --enable-automatic-cluster-update --enable-enhanced-security-monitoring --compute-mode Hybrid
+
+    Note: Serverless compute mode does not support custom VNet configuration, custom encryption, access connectors, default catalog properties, workspace custom parameters, or managed resource groups. These features are only available with Hybrid compute mode.
     """
 
     _aaz_info = {
@@ -41,7 +46,58 @@ class Create(AAZCommand):
 
     def _handler(self, command_args):
         super()._handler(command_args)
+        self._validate_serverless_restrictions(command_args)
         return self.build_lro_poller(self._execute_operations, self._output)
+
+    def _validate_serverless_restrictions(self, args):
+        """Validate that certain features are not used with Serverless compute mode."""
+        from azure.cli.core.azclierror import InvalidArgumentValueError
+        
+        compute_mode = args.compute_mode
+        if compute_mode and compute_mode.lower() == 'serverless':
+            # List of incompatible features with Serverless mode
+            incompatible_features = []
+            
+            # Check for access connector
+            if args.access_connector:
+                incompatible_features.append("--access-connector")
+            
+            # Check for custom VNet configuration (Serverless doesn't support custom VNet)
+            if args.vnet:
+                incompatible_features.append("--vnet")
+            if args.private_subnet:
+                incompatible_features.append("--private-subnet")
+            if args.public_subnet:
+                incompatible_features.append("--public-subnet")
+            
+            # Check for no public IP (not applicable to Serverless)
+            if args.enable_no_public_ip:
+                incompatible_features.append("--enable-no-public-ip")
+            
+            # Check for disk encryption (Serverless manages its own storage)
+            if args.disk_key_source:
+                incompatible_features.append("--disk-key-source")
+            if args.disk_key_name:
+                incompatible_features.append("--disk-key-name")
+            if args.disk_key_vault:
+                incompatible_features.append("--disk-key-vault")
+            if args.disk_key_version:
+                incompatible_features.append("--disk-key-version")
+            if args.disk_key_auto_rotation:
+                incompatible_features.append("--disk-key-auto-rotation")
+            
+            # Check for managed resource group (Serverless manages its own resources)
+            if args.managed_resource_group:
+                incompatible_features.append("--managed-resource-group")
+            
+            if incompatible_features:
+                feature_list = ", ".join(incompatible_features)
+                raise InvalidArgumentValueError(
+                    f"The following features are not supported with Serverless compute mode: {feature_list}. "
+                    f"Serverless workspaces are fully managed and do not support custom networking, "
+                    f"storage encryption, or external access connectors. Please use Hybrid compute mode "
+                    f"or remove these features."
+                )
 
     _args_schema = None
 
@@ -73,10 +129,16 @@ class Create(AAZCommand):
                 resource_group_arg="resource_group",
             ),
         )
+        _args_schema.compute_mode = AAZStrArg(
+            options=["--compute-mode"],
+            help="The compute mode for the workspace. Allowed values: 'Hybrid', 'Serverless'.",
+            required=True,
+            enum={"Hybrid": "Hybrid", "Serverless": "Serverless"},
+        )
         _args_schema.managed_resource_group = AAZStrArg(
             options=["--managed-resource-group"],
             help="The managed resource group to create. It can be either a name or a resource ID.",
-            required=True,
+            required=False,
         )
         _args_schema.enable_no_public_ip = AAZBoolArg(
             options=["--enable-no-public-ip"],
@@ -197,14 +259,14 @@ class Create(AAZCommand):
         _args_schema.compliance_standards = AAZListArg(
             options=["--compliance-standards"],
             arg_group="Enhanced Security Compliance",
-            help="Compliance Standards associated with the workspace, allowed values: NONE, HIPAA, PCI_DSS.",
+            help="Compliance Standards associated with the workspace, allowed values: NONE, HIPAA, PCI_DSS, CYBER_ESSENTIAL_PLUS, FEDRAMP_HIGH, CANADA_PROTECTED_B, IRAP_PROTECTED, ISMAP, HITRUST, K_FSI, GERMANY_C5, GERMANY_TISAX.",
             nullable=True,
         )
         _args_schema.compliance_standards.Element = AAZStrArg(
             nullable=True,
             arg_group="Enhanced Security Compliance",
-            help="Compliance standards, allowed values: NONE, HIPAA, PCI_DSS.",
-            enum={"HIPAA": "HIPAA", "NONE": "NONE", "PCI_DSS": "PCI_DSS"},
+            help="Compliance standards, allowed values: NONE, HIPAA, PCI_DSS, CYBER_ESSENTIAL_PLUS, FEDRAMP_HIGH, CANADA_PROTECTED_B, IRAP_PROTECTED, ISMAP, HITRUST, K_FSI, GERMANY_C5, GERMANY_TISAX.",
+            enum={"HIPAA": "HIPAA", "NONE": "NONE", "PCI_DSS": "PCI_DSS", "CYBER_ESSENTIAL_PLUS": "CYBER_ESSENTIAL_PLUS", "FEDRAMP_HIGH": "FEDRAMP_HIGH", "CANADA_PROTECTED_B": "CANADA_PROTECTED_B", "IRAP_PROTECTED": "IRAP_PROTECTED", "ISMAP": "ISMAP", "HITRUST": "HITRUST", "K_FSI": "K_FSI", "GERMANY_C5": "GERMANY_C5", "GERMANY_TISAX": "GERMANY_TISAX"},
         )
         _args_schema.enable_compliance_security_profile = AAZBoolArg(
             options=["--enable-compliance-security-profile", "--enable-csp"],
@@ -317,9 +379,8 @@ class Create(AAZCommand):
 
         compliance_standards = cls._args_schema.enhanced_security_compliance.compliance_security_profile.compliance_standards
         compliance_standards.Element = AAZStrArg(
-            enum={"HIPAA": "HIPAA", "NONE": "NONE", "PCI_DSS": "PCI_DSS"},
+            enum={"HIPAA": "HIPAA", "NONE": "NONE", "PCI_DSS": "PCI_DSS", "CYBER_ESSENTIAL_PLUS": "CYBER_ESSENTIAL_PLUS", "FEDRAMP_HIGH": "FEDRAMP_HIGH", "CANADA_PROTECTED_B": "CANADA_PROTECTED_B", "IRAP_PROTECTED": "IRAP_PROTECTED", "ISMAP": "ISMAP", "HITRUST": "HITRUST", "K_FSI": "K_FSI", "GERMANY_C5": "GERMANY_C5", "GERMANY_TISAX": "GERMANY_TISAX"},
         )
-
         enhanced_security_monitoring = cls._args_schema.enhanced_security_compliance.enhanced_security_monitoring
         enhanced_security_monitoring.value = AAZStrArg(
             options=["value"],
@@ -462,11 +523,12 @@ class Create(AAZCommand):
             properties = _builder.get(".properties")
             if properties is not None:
                 properties.set_prop("accessConnector", AAZObjectType, ".access_connector")
+                properties.set_prop("computeMode", AAZStrType, ".compute_mode", typ_kwargs={"flags": {"required": True}})
                 properties.set_prop("defaultCatalog", AAZObjectType, ".default_catalog")
                 properties.set_prop("defaultStorageFirewall", AAZStrType, ".default_storage_firewall")
                 properties.set_prop("encryption", AAZObjectType)
                 properties.set_prop("enhancedSecurityCompliance", AAZObjectType, ".enhanced_security_compliance")
-                properties.set_prop("managedResourceGroupId", AAZStrType, ".managed_resource_group", typ_kwargs={"flags": {"required": True}})
+                properties.set_prop("managedResourceGroupId", AAZStrType, ".managed_resource_group", typ_kwargs={"flags": {"required": False}})
                 properties.set_prop("parameters", AAZObjectType)
                 properties.set_prop("publicNetworkAccess", AAZStrType, ".public_network_access")
                 properties.set_prop("requiredNsgRules", AAZStrType, ".required_nsg_rules")
@@ -476,6 +538,13 @@ class Create(AAZCommand):
                 access_connector.set_prop("id", AAZStrType, ".id", typ_kwargs={"flags": {"required": True}})
                 access_connector.set_prop("identityType", AAZStrType, ".identity_type", typ_kwargs={"flags": {"required": True}})
                 access_connector.set_prop("userAssignedIdentityId", AAZStrType, ".user_assigned_identity_id")
+
+            compute_mode = _builder.get(".properties.computeMode")
+            if compute_mode is not None:
+                compute_mode.set_prop("value", AAZStrType, ".value", typ_kwargs={"flags": {"required": True}})
+            else:
+                # Set computeMode to 'Hybrid' if not provided
+                compute_mode.set_prop("value", AAZStrType, ".value", default="Hybrid", typ_kwargs={"flags": {"required": True}})
 
             default_catalog = _builder.get(".properties.defaultCatalog")
             if default_catalog is not None:
@@ -667,6 +736,9 @@ class Create(AAZCommand):
             properties.access_connector = AAZObjectType(
                 serialized_name="accessConnector",
             )
+            properties.compute_mode = AAZStrType(
+                serialized_name="computeMode",
+            )
             properties.authorizations = AAZListType()
             properties.created_by = AAZObjectType(
                 serialized_name="createdBy",
@@ -700,7 +772,7 @@ class Create(AAZCommand):
             _CreateHelper._build_schema_managed_identity_configuration_read(properties.managed_disk_identity)
             properties.managed_resource_group_id = AAZStrType(
                 serialized_name="managedResourceGroupId",
-                flags={"required": True},
+                flags={"required": False},
             )
             properties.parameters = AAZObjectType()
             properties.private_endpoint_connections = AAZListType(
