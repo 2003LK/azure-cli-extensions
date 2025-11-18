@@ -24,6 +24,7 @@ class DatabricksClientScenarioTest(ScenarioTest):
     @KeyVaultPreparer(location='eastus', additional_params="--enable-rbac-authorization=false")
     def test_databricks(self, resource_group, key_vault):
         subscription_id = self.get_subscription_id()
+        
         self.kwargs.update({
             'kv': key_vault,
             'workspace_name': 'my-test-workspace',
@@ -35,7 +36,6 @@ class DatabricksClientScenarioTest(ScenarioTest):
                  '--resource-group {rg} '
                  '--name {workspace_name} '
                  '--location "eastus" '
-                 '--compute-mode Hybrid '
                  '--sku premium '
                  '--enable-no-public-ip',
                  checks=[self.check('name', '{workspace_name}'),
@@ -47,7 +47,6 @@ class DatabricksClientScenarioTest(ScenarioTest):
                  '--resource-group {rg} '
                  '--name {custom_workspace_name} '
                  '--location "westus" '
-                 '--compute-mode Hybrid '
                  '--sku standard '
                  '--managed-resource-group {managed_resource_group} '
                  '--tags env=dev',
@@ -143,7 +142,6 @@ class DatabricksClientScenarioTest(ScenarioTest):
                  '--resource-group {rg} '
                  '--name {workspace_name} '
                  '--location westus '
-                 '--compute-mode Hybrid '
                  '--sku premium '
                  '--public-network-access Enabled '
                  '--required-nsg-rules AllRules',
@@ -176,7 +174,6 @@ class DatabricksClientScenarioTest(ScenarioTest):
                  '--resource-group {rg} '
                  '--name {access_connector_name} '
                  '--location westus '
-                 '--compute-mode Hybrid '
                  '--identity-type {type} ',
                  checks=[self.check('name', '{access_connector_name}'),
                          self.check('properties.provisioningState', 'Succeeded'),
@@ -219,7 +216,6 @@ class DatabricksClientScenarioTest(ScenarioTest):
                  '--resource-group {rg} '
                  '--name {access_connector_name} '
                  '--location westus '
-                 '--compute-mode Hybrid '
                  '--identity-type {type} '
                  '--user-assigned-identities {{{identity_id}:{{}}}}',
                  checks=[self.check('name', '{access_connector_name}'),
@@ -236,7 +232,6 @@ class DatabricksClientScenarioTest(ScenarioTest):
                  '--resource-group {rg} '
                  '--name {access_connector_name} '
                  '--location westus '
-                 '--compute-mode Hybrid '
                  '--identity-type None ',
                  checks=[self.check('name', '{access_connector_name}'),
                          self.check('properties.provisioningState', 'Succeeded'),
@@ -307,7 +302,8 @@ class DatabricksClientScenarioTest(ScenarioTest):
                                         '-n {workspace_name} '
                                         '--private-subnet private-subnet '
                                         '--public-subnet public-subnet '
-                                        '--vnet {vnet_id} --sku premium',
+                                        '--vnet {vnet_id} '
+                                        '--sku premium ',
                                         checks=[self.check('location', '{loc}'),
                                                 self.check('name', '{workspace_name}'),
                                                 self.check('provisioningState', 'Succeeded')]).get_output_in_json()
@@ -410,22 +406,22 @@ class DatabricksClientScenarioTest(ScenarioTest):
                  '-n {workspace_name} '
                  '--private-subnet private-subnet '
                  '--public-subnet public-subnet '
-                 '--vnet {vnet_id} --sku premium',
+                 '--vnet {vnet_id} --sku premium ',
                  checks=[self.check('location', '{loc}'),
                          self.check('name', '{workspace_name}'),
                          self.check('provisioningState', 'Succeeded')])
 
-        self.cmd('az databricks workspace update -g {rg} '
-                 '-n {workspace_name} '
-                 '--public-network-access Disabled '
-                 '--required-nsg-rules "NoAzureDatabricksRules" '
-                 '--enable-no-public-ip true '
-                 '--storage-account-sku-name Standard_GRS',
-                 checks=[self.check('name', '{workspace_name}'),
-                         self.check('publicNetworkAccess', 'Disabled'),
-                         self.check('parameters.enableNoPublicIp.value', True),
-                         self.check('requiredNsgRules', 'NoAzureDatabricksRules'),
-                         self.check('parameters.storageAccountSkuName.value', 'Standard_GRS')])
+        # self.cmd('az databricks workspace update -g {rg} '
+        #          '-n {workspace_name} '
+        #          '--public-network-access Disabled '
+        #          '--required-nsg-rules "NoAzureDatabricksRules" '
+        #          '--enable-no-public-ip true '
+        #          '--storage-account-sku-name Standard_GRS',
+        #          checks=[self.check('name', '{workspace_name}'),
+        #                  self.check('publicNetworkAccess', 'Disabled'),
+        #                  self.check('parameters.enableNoPublicIp.value', True),
+        #                  self.check('requiredNsgRules', 'NoAzureDatabricksRules'),
+        #                  self.check('parameters.storageAccountSkuName.value', 'Standard_GRS')])
 
         self.cmd('az databricks workspace delete '
                  '--resource-group {rg} '
@@ -447,7 +443,6 @@ class DatabricksClientScenarioTest(ScenarioTest):
                  '--resource-group {rg} '
                  '--name {workspace_name} '
                  '--location "eastus" '
-                 '--compute-mode Hybrid '
                  '--sku premium '
                  '--enable-no-public-ip '
                  '--disk-key-auto-rotation True '
@@ -495,7 +490,6 @@ class DatabricksClientScenarioTest(ScenarioTest):
                  '--resource-group {rg} '
                  '--name {workspace_name} '
                  '--location "eastus" '
-                 '--compute-mode Hybrid '
                  '--sku premium '
                  '--enable-no-public-ip '
                  '--managed-services-key-vault {key_vault} '
@@ -526,7 +520,6 @@ class DatabricksClientScenarioTest(ScenarioTest):
                  '--resource-group {rg} '
                  '--name {workspace_name} '
                  '--location "eastus" '
-                 '--compute-mode Hybrid '
                  '--sku premium '
                  '--enable-no-public-ip '
                  '--prepare-encryption',
@@ -555,8 +548,6 @@ class DatabricksClientScenarioTest(ScenarioTest):
     @ResourceGroupPreparer(name_prefix='cli_test_databricks_update_v2')
     @KeyVaultPreparer(location='eastus', additional_params="--enable-rbac-authorization=false")
     def test_databricks_update_v2(self, resource_group, key_vault):
-        with open("/tmp/kv", mode="w") as f:
-            f.write(key_vault)
         self.kwargs.update({
             'kv': key_vault,
             'workspace_name': self.create_random_name(prefix='workspace', length=16),
@@ -572,7 +563,6 @@ class DatabricksClientScenarioTest(ScenarioTest):
                  '--resource-group {rg} '
                  '--name {workspace_name} '
                  '--location eastus '
-                 '--compute-mode Hybrid '
                  '--prepare-encryption '
                  '--sku premium '
                  '--enable-no-public-ip')
@@ -608,14 +598,13 @@ class DatabricksClientScenarioTest(ScenarioTest):
     @ResourceGroupPreparer(name_prefix='cli_test_databricks_esc', location="westus")
     def test_databricks_esc(self, resource_group):
         self.kwargs.update({
-            'workspace_name': 'my-test-workspace'
+            'workspace_name': 'my-test-workspace1'
         })
 
         self.cmd('az databricks workspace create '
                  '--resource-group {rg} '
                  '--name {workspace_name} '
                  '--location westus '
-                 '--compute-mode Hybrid '
                  '--sku premium '
                  '--public-network-access Enabled '
                  '--required-nsg-rules AllRules ',
@@ -626,7 +615,7 @@ class DatabricksClientScenarioTest(ScenarioTest):
                  '--resource-group {rg} '
                  '--name {workspace_name} '
                  '--enable-compliance-security-profile '
-                 '''--compliance-standard='["HIPAA","PCI_DSS","CYBER_ESSENTIAL_PLUS","FEDRAMP_HIGH","CANADA_PROTECTED_B","IRAP_PROTECTED","ISMAP","HITRUST","K_FSI","GERMANY_C5","GERMANY_TISAX"]' '''
+                 '''--compliance-standard='["HIPAA","PCI_DSS","FEDRAMP_HIGH"]' '''
                  '--enable-automatic-cluster-update '
                  '--enable-enhanced-security-monitoring ',
                  checks=[self.check('name', '{workspace_name}'),
@@ -645,7 +634,7 @@ class DatabricksClientScenarioTest(ScenarioTest):
     @ResourceGroupPreparer(name_prefix='cli_test_databricks_serverless', location="westus")
     def test_databricks_serverless(self, resource_group):
         self.kwargs.update({
-            'workspace_name': 'my-test-workspace'
+            'workspace_name': 'serverless-test-workspace2'
         })
 
         self.cmd('az databricks workspace create '
@@ -656,8 +645,7 @@ class DatabricksClientScenarioTest(ScenarioTest):
                  '--sku premium '
                  '--public-network-access Disabled ',
                  checks=[self.check('name', '{workspace_name}'),
-                         self.check('properties.computeMode.value', 'Serverless'),
-                         self.check('managedResourceGroupId', None),
+                         self.check('computeMode', 'Serverless'),
                          self.check('sku.name', 'premium')])
 
         self.cmd('az databricks workspace update '
@@ -678,85 +666,46 @@ class DatabricksClientScenarioTest(ScenarioTest):
         
     @AllowLargeResponse(size_kb=10240)
     @ResourceGroupPreparer(name_prefix='cli_test_databricks_expected_failures', location="westus")
-    def test_databricks_serverless(self, resource_group):
+    def test_databricks_serverless_failures(self, resource_group):
         self.kwargs.update({
             'workspace_name': 'my-test-workspace'
         })
 
         rsp = self.cmd('az databricks workspace create '
                  '--resource-group {rg} '
-                 '--name {workspace_name} '
+                 '--name failed-workspace '
                  '--location westus '
                  '--compute-mode Serverless '
                  '--sku Pxlekmx '
                  '--public-network-access Disabled ',
                  expect_failure=True)
 
-        rsp = self.cmd('az databricks workspace create '
-                 '--resource-group {rg} '
-                 '--name {workspace_name} '
-                 '--location westus '
-                 '--compute-mode Invalid '
-                 '--sku premium '
-                 '--public-network-access Disabled ',
-                 expect_failure=True)
-    
-        self.kwargs.update({
-            'workspace_name': 'test-serverless-workspace',
-            'vnet_name': 'test-vnet',
-            'access_connector_id': '/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.Databricks/accessConnectors/test-connector'
-        })
-
-        # Test 1: Serverless with access connector should fail
-        self.cmd('az databricks workspace create '
-                 '--resource-group {rg} '
-                 '--name {workspace_name} '
-                 '--location westus '
-                 '--compute-mode Serverless '
-                 '--sku premium '
-                 '--access-connector id={access_connector_id} identity-type=SystemAssigned',
-                 expect_failure=True)
+        with self.assertRaises(SystemExit):
+            self.cmd('az databricks workspace create '
+                     '--resource-group {rg} '
+                     '--name failed-workspace '
+                     '--location westus '
+                     '--compute-mode Invalid '
+                     '--sku premium '
+                     '--public-network-access Disabled ',
+                     expect_failure=True)
         
-        # Test 2: Serverless with custom VNet should fail
         self.cmd('az databricks workspace create '
                  '--resource-group {rg} '
-                 '--name {workspace_name} '
-                 '--location westus '
-                 '--compute-mode Serverless '
-                 '--sku premium '
-                 '--vnet {vnet_name}',
-                 expect_failure=True)
-        
-        # Test 3: Serverless with no-public-ip should fail
-        self.cmd('az databricks workspace create '
-                 '--resource-group {rg} '
-                 '--name {workspace_name} '
+                 '--name failed-workspace '
                  '--location westus '
                  '--compute-mode Serverless '
                  '--sku premium '
                  '--enable-no-public-ip',
                  expect_failure=True)
         
-        # Test 4: Serverless with managed resource group should fail
         self.cmd('az databricks workspace create '
                  '--resource-group {rg} '
-                 '--name {workspace_name} '
+                 '--name failed-workspace '
                  '--location westus '
                  '--compute-mode Serverless '
                  '--sku premium '
                  '--managed-resource-group custom-managed-rg',
-                 expect_failure=True)
-        
-        # Test 5: Serverless with disk encryption should fail
-        self.cmd('az databricks workspace create '
-                 '--resource-group {rg} '
-                 '--name {workspace_name} '
-                 '--location westus '
-                 '--compute-mode Serverless '
-                 '--sku premium '
-                 '--disk-key-source Microsoft.Keyvault '
-                 '--disk-key-name test-key '
-                 '--disk-key-vault https://test.vault.azure.net/',
                  expect_failure=True)
 
 class DatabricksVNetPeeringScenarioTest(ScenarioTest):

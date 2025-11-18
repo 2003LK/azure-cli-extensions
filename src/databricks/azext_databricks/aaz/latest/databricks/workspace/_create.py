@@ -53,41 +53,63 @@ class Create(AAZCommand):
         """Validate that certain features are not used with Serverless compute mode."""
         from azure.cli.core.azclierror import InvalidArgumentValueError
         
-        compute_mode = args.compute_mode
+        # Get compute mode - handle AAZ argument objects
+        compute_mode = getattr(args, 'compute_mode', None)
+        if compute_mode is not None:
+            # If it's an AAZ argument object, get its value
+            if hasattr(compute_mode, 'to_serialized_data'):
+                compute_mode = compute_mode.to_serialized_data()
+            elif hasattr(compute_mode, '__call__'):
+                compute_mode = compute_mode()
+            # Convert to string if it's not already
+            if compute_mode is not None:
+                compute_mode = str(compute_mode)
+        
         if compute_mode and compute_mode.lower() == 'serverless':
             # List of incompatible features with Serverless mode
             incompatible_features = []
             
+            # Helper function to safely get argument value
+            def get_arg_value(arg_name):
+                value = getattr(args, arg_name, None)
+                if value is not None:
+                    # Handle AAZ argument objects
+                    if hasattr(value, 'to_serialized_data'):
+                        value = value.to_serialized_data()
+                    elif hasattr(value, '__call__'):
+                        value = value()
+                return value
+            
             # Check for access connector
-            if args.access_connector:
+            if get_arg_value('access_connector'):
                 incompatible_features.append("--access-connector")
             
             # Check for custom VNet configuration (Serverless doesn't support custom VNet)
-            if args.vnet:
+            if get_arg_value('vnet'):
                 incompatible_features.append("--vnet")
-            if args.private_subnet:
+            if get_arg_value('private_subnet'):
                 incompatible_features.append("--private-subnet")
-            if args.public_subnet:
+            if get_arg_value('public_subnet'):
                 incompatible_features.append("--public-subnet")
             
             # Check for no public IP (not applicable to Serverless)
-            if args.enable_no_public_ip:
+            if get_arg_value('enable_no_public_ip'):
                 incompatible_features.append("--enable-no-public-ip")
             
             # Check for disk encryption (Serverless manages its own storage)
-            if args.disk_key_source:
+            if get_arg_value('disk_key_source'):
                 incompatible_features.append("--disk-key-source")
-            if args.disk_key_name:
+            if get_arg_value('disk_key_name'):
                 incompatible_features.append("--disk-key-name")
-            if args.disk_key_vault:
+            if get_arg_value('disk_key_vault'):
                 incompatible_features.append("--disk-key-vault")
-            if args.disk_key_version:
+            if get_arg_value('disk_key_version'):
                 incompatible_features.append("--disk-key-version")
-            if args.disk_key_auto_rotation:
+            if get_arg_value('disk_key_auto_rotation'):
                 incompatible_features.append("--disk-key-auto-rotation")
             
             # Check for managed resource group (Serverless manages its own resources)
-            if args.managed_resource_group:
+            if get_arg_value('managed_resource_group'):
                 incompatible_features.append("--managed-resource-group")
             
             if incompatible_features:
@@ -132,7 +154,7 @@ class Create(AAZCommand):
         _args_schema.compute_mode = AAZStrArg(
             options=["--compute-mode"],
             help="The compute mode for the workspace. Allowed values: 'Hybrid', 'Serverless'.",
-            required=True,
+            required=False,
             enum={"Hybrid": "Hybrid", "Serverless": "Serverless"},
         )
         _args_schema.managed_resource_group = AAZStrArg(
@@ -523,12 +545,28 @@ class Create(AAZCommand):
             properties = _builder.get(".properties")
             if properties is not None:
                 properties.set_prop("accessConnector", AAZObjectType, ".access_connector")
-                properties.set_prop("computeMode", AAZStrType, ".compute_mode", typ_kwargs={"flags": {"required": True}})
+                properties.set_prop("computeMode", AAZStrType, ".compute_mode", typ_kwargs={"flags": {"required": False}})
                 properties.set_prop("defaultCatalog", AAZObjectType, ".default_catalog")
                 properties.set_prop("defaultStorageFirewall", AAZStrType, ".default_storage_firewall")
                 properties.set_prop("encryption", AAZObjectType)
                 properties.set_prop("enhancedSecurityCompliance", AAZObjectType, ".enhanced_security_compliance")
-                properties.set_prop("managedResourceGroupId", AAZStrType, ".managed_resource_group", typ_kwargs={"flags": {"required": False}})
+                
+                # Only add managedResourceGroupId if compute mode is not Serverless
+                compute_mode = getattr(self.ctx.args, 'compute_mode', None)
+                compute_mode_value = None
+                if compute_mode is not None:
+                    if hasattr(compute_mode, 'to_serialized_data'):
+                        compute_mode_value = compute_mode.to_serialized_data()
+                    elif hasattr(compute_mode, '_value'):
+                        compute_mode_value = compute_mode._value
+                    else:
+                        compute_mode_value = compute_mode
+                
+                # Only include managedResourceGroupId if compute mode is NOT Serverless
+                # Serverless workspaces don't support managed resource groups
+                if compute_mode_value != "Serverless":
+                    properties.set_prop("managedResourceGroupId", AAZStrType, ".managed_resource_group", typ_kwargs={"flags": {"required": False}})
+                
                 properties.set_prop("parameters", AAZObjectType)
                 properties.set_prop("publicNetworkAccess", AAZStrType, ".public_network_access")
                 properties.set_prop("requiredNsgRules", AAZStrType, ".required_nsg_rules")
@@ -541,10 +579,10 @@ class Create(AAZCommand):
 
             compute_mode = _builder.get(".properties.computeMode")
             if compute_mode is not None:
-                compute_mode.set_prop("value", AAZStrType, ".value", typ_kwargs={"flags": {"required": True}})
+                compute_mode.set_prop("value", AAZStrType, ".value", typ_kwargs={"flags": {"required": False}})
             else:
                 # Set computeMode to 'Hybrid' if not provided
-                compute_mode.set_prop("value", AAZStrType, ".value", default="Hybrid", typ_kwargs={"flags": {"required": True}})
+                compute_mode.set_prop("value", AAZStrType, ".value", default="Hybrid", typ_kwargs={"flags": {"required": False}})
 
             default_catalog = _builder.get(".properties.defaultCatalog")
             if default_catalog is not None:
