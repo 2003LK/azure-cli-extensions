@@ -40,9 +40,9 @@ class Update(AAZCommand):
     """
 
     _aaz_info = {
-        "version": "2024-05-01",
+        "version": "2025-10-01-preview",
         "resources": [
-            ["mgmt-plane", "/subscriptions/{}/resourcegroups/{}/providers/microsoft.databricks/workspaces/{}", "2024-05-01"],
+            ["mgmt-plane", "/subscriptions/{}/resourcegroups/{}/providers/microsoft.databricks/workspaces/{}", "2025-10-01-preview"],
         ]
     }
 
@@ -477,7 +477,7 @@ class Update(AAZCommand):
         def query_parameters(self):
             parameters = {
                 **self.serialize_query_param(
-                    "api-version", "2024-05-01",
+                    "api-version", "2025-10-01-preview",
                     required=True,
                 ),
             }
@@ -576,7 +576,7 @@ class Update(AAZCommand):
         def query_parameters(self):
             parameters = {
                 **self.serialize_query_param(
-                    "api-version", "2024-05-01",
+                    "api-version", "2025-10-01-preview",
                     required=True,
                 ),
             }
@@ -967,6 +967,10 @@ class _UpdateHelper:
         properties.access_connector = AAZObjectType(
             serialized_name="accessConnector",
         )
+        properties.compute_mode = AAZStrType(
+            serialized_name="computeMode",
+            flags={"read_only": True},
+        )
         properties.authorizations = AAZListType()
         properties.created_by = AAZObjectType(
             serialized_name="createdBy",
@@ -1000,7 +1004,7 @@ class _UpdateHelper:
         cls._build_schema_managed_identity_configuration_read(properties.managed_disk_identity)
         properties.managed_resource_group_id = AAZStrType(
             serialized_name="managedResourceGroupId",
-            flags={"required": True},
+            flags={"required": False},
         )
         properties.parameters = AAZObjectType()
         properties.private_endpoint_connections = AAZListType(
